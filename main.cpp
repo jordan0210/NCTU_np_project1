@@ -8,9 +8,9 @@ using namespace std;
 
 void init_shell();
 
-void parsePipe();
+void parsePipe(string cmdLine, vector<string> &cmdBlocks);
 
-void parseCmd(string cmdLine, vector<string> &argv);
+void parseCmd(string cmdBlock, vector<string> &argv);
 
 void exec_cmd(vector<string> &vec);
 
@@ -31,31 +31,46 @@ void init_shell(){
 	printf("***********\n");
 	
 	string cmdLine;
+	vector<string> cmdBlocks;
 	vector<string> argv;
 	while (true) {
 		cout << "% ";
 		getline(cin, cmdLine);
-		parseCmd(cmdLine, argv);
+		parsePipe(cmdLine, cmdBlocks);
 		
-		exec_cmd(argv);
-		argv.clear();
+		while (!cmdBlocks.empty()){
+			parseCmd(cmdBlocks[0], argv);
+			exec_cmd(argv);
+			argv.clear();
+			cmdBlocks.erase(cmdBlocks.begin());
+		}
 	}
 }
 
 //parse input commandLine into commandBlocks
-void parsePipe(){
+void parsePipe(string cmdLine, vector<string> &cmdBlocks){
+	int front = 0;
+	int end;
+	string temp_str;
+	cmdLine += "|";
 
+	while ((end = cmdLine.find_first_of("|!", front)) != -1){
+		temp_str = cmdLine.substr(front, end-front);
+		if (temp_str[0] == ' ') temp_str = temp_str.substr(1);
+		if (temp_str[temp_str.length()-1] == ' ') temp_str = temp_str.substr(0, temp_str.length()-1);
+		cmdBlocks.push_back(temp_str);
+		front = end + 1;
+	}
 }
 
 //parse inpur commandBlock into command and arguments 
 void parseCmd(string cmdBlock, vector<string> &argv){
 	int front = 0;
 	int end;
-	int counter = 0;
 	cmdBlock += " ";
 
 	//read arguments
-	while((end = cmdBlock.find(" ", front)) != -1){
+	while ((end = cmdBlock.find(" ", front)) != -1){
 		argv.push_back(cmdBlock.substr(front, end-front));
 		front = end + 1;
 	}
@@ -140,17 +155,8 @@ void exec_cmd(vector<string> &vec){
 				wait(&status);
 		}
 	} else if (cmd == "printenv"){
-		switch(fork()){
-			int *status;
-			case -1:
-				perror("fork()");
-				exit(-1);
-			case 0:
-				cout << getenv(argv[1]) << endl;
-				exit(0);
-			default:
-				wait(&status);
-		}
+		if (getenv(argv[1]) != NULL)
+			cout << getenv(argv[1]) << endl;
 	} else if (cmd == "setenv"){
 		setenv(argv[1], argv[2], 1);
 	} else if (cmd == "exit" || cmd == "EOF") {
