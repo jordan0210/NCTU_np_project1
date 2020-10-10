@@ -3,6 +3,7 @@
 #include <vector>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 using namespace std;
 
@@ -14,7 +15,9 @@ void parseCmd(string cmdBlock, vector<string> &argv);
 
 void exec_cmd(vector<string> &vec);
 
-void vec2arr(vector<string> &vec, char *arr[]);
+void vec2arr(vector<string> &vec, char *arr[], int index);
+
+int findIndex(vector<string> &vec, string str);
 
 int main(){
 	init_shell();
@@ -33,6 +36,7 @@ void init_shell(){
 	string cmdLine;
 	vector<string> cmdBlocks;
 	vector<string> argv;
+	
 	while (true) {
 		cout << "% ";
 		getline(cin, cmdLine);
@@ -68,7 +72,7 @@ void parseCmd(string cmdBlock, vector<string> &argv){
 	int front = 0;
 	int end;
 	cmdBlock += " ";
-
+	
 	//read arguments
 	while ((end = cmdBlock.find(" ", front)) != -1){
 		argv.push_back(cmdBlock.substr(front, end-front));
@@ -81,77 +85,26 @@ void exec_cmd(vector<string> &vec){
 	char *argv[1000];
 	string cmd = vec[0];
 
-	vec2arr(vec, argv);
-	if (cmd == "ls"){
+	//vec2arr(vec, argv);
+	if (cmd == "ls" || cmd == "cat" || cmd == "noop" || cmd == "number" || cmd == "removetag" || cmd == "removetag0"){
 		switch (fork()){
 			int *status;
 			case -1 :
 				perror("fork()");
 				exit(-1);
 			case 0 :
-				execv("./bin/ls", argv);
+				int fd, index;
+				if ((index = findIndex(vec, ">")) == -1){
+					vec2arr(vec, argv, vec.size());
+				} else {
+					fd = open(vec.back().data(), O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+					dup2(fd, 1);
+					close(3);
+					vec2arr(vec, argv, index);
+				}
+				execv(("./bin/"+cmd).data(), argv);
 				exit(0);
 			default :
-				wait(&status);
-		}
-	} else if (cmd == "cat"){
-		switch (fork()){
-			int *status;
-			case -1:
-				perror("fork()");
-				exit(-1);
-			case 0:
-				execv("./bin/cat", argv);
-				exit(0);
-			default:
-				wait(&status);
-		}
-	} else if (cmd == "noop"){
-		switch(fork()){
-			int *status;
-			case -1:
-				perror("fork()");
-				exit(-1);
-			case 0:
-				execv("./bin/noop", argv);
-				exit(0);
-			default:
-				wait(&status);
-		}
-	} else if (cmd == "number"){
-		switch(fork()){
-			int *status;
-			case -1:
-				perror("fork()");
-				exit(-1);
-			case 0:
-				execv("./bin/number", argv);
-				exit(0);
-			default:
-				wait(&status);
-		}
-	} else if (cmd == "removetag"){
-		switch(fork()){
-			int *status;
-			case -1:
-				perror("fork()");
-				exit(-1);
-			case 0:
-				execv("./bin/removetag", argv);
-				exit(0);
-			default:
-				wait(&status);
-		}
-	} else if (cmd == "removetag0"){
-		switch(fork()){
-			int *status;
-			case -1:
-				perror("fork()");
-				exit(-1);
-			case 0:
-				execv("./bin/removetag0", argv);
-				exit(0);
-			default:
 				wait(&status);
 		}
 	} else if (cmd == "printenv"){
@@ -166,9 +119,22 @@ void exec_cmd(vector<string> &vec){
 	}
 }
 
-void vec2arr(vector<string> &vec, char *arr[]){
-	for (int i=0; i<vec.size(); i++){
+void vec2arr(vector<string> &vec, char *arr[], int index){
+	for (int i=0; i<index; i++){
 		arr[i] = (char*)vec[i].data();	
 	}
 	arr[vec.size()] = NULL;
+}
+
+int findIndex(vector<string> &vec, string str){
+	int index;
+	for (index=0; index<vec.size(); index++){
+		if (vec[index] == str){
+			break;
+		}
+	}
+	if (index == vec.size()){
+		index = -1;
+	}
+	return index;
 }
