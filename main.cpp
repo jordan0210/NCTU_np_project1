@@ -24,6 +24,8 @@ int main(){
 // Getting start for a shell
 void init_shell(){
 	system("clear");
+	setenv("PATH", "bin:.", 1);
+	
 	printf("***********\n");
 	printf("**SUCCESS**\n");
 	printf("***********\n");
@@ -78,29 +80,79 @@ void exec_cmd(vector<string> &vec){
 				wait(&status);
 		}
 	} else if (cmd == "cat"){
-	
+		switch (fork()){
+			int *status;
+			case -1:
+				perror("fork()");
+				exit(-1);
+			case 0:
+				execv("./bin/cat", argv);
+				exit(0);
+			default:
+				wait(&status);
+		}
 	} else if (cmd == "noop"){
-		
+		switch(fork()){
+			int *status;
+			case -1:
+				perror("fork()");
+				exit(-1);
+			case 0:
+				execv("./bin/noop", argv);
+				exit(0);
+			default:
+				wait(&status);
+		}
 	} else if (cmd == "number"){
-	
+		switch(fork()){
+			int *status;
+			case -1:
+				perror("fork()");
+				exit(-1);
+			case 0:
+				execv("./bin/number", argv);
+				exit(0);
+			default:
+				wait(&status);
+		}
 	} else if (cmd == "removetag"){
-	
+		switch(fork()){
+			int *status;
+			case -1:
+				perror("fork()");
+				exit(-1);
+			case 0:
+				execv("./bin/removetag", argv);
+				exit(0);
+			default:
+				wait(&status);
+		}
 	} else if (cmd == "removetag0"){
-	
+		switch(fork()){
+			int *status;
+			case -1:
+				perror("fork()");
+				exit(-1);
+			case 0:
+				execv("./bin/removetag0", argv);
+				exit(0);
+			default:
+				wait(&status);
+		}
 	} else if (cmd == "printenv"){
 		switch(fork()){
 			int *status;
-			case -1 :
+			case -1:
 				perror("fork()");
 				exit(-1);
-			case 0 :
-				cout << getenv("PATH") << endl;
+			case 0:
+				cout << getenv(argv[1]) << endl;
 				exit(0);
-			default :
+			default:
 				wait(&status);
 		}
 	} else if (cmd == "setenv"){
-	
+		setenv(argv[1], argv[2], 1);
 	} else if (cmd == "exit" || cmd == "EOF") {
 		exit(0);
 	} else {
