@@ -27,7 +27,7 @@ void parsePipe(string cmdLine, vector<cmdBlock> &cmdBlocks);
 
 void parseCmd(cmdBlock &cmdBlock);
 
-void checkPipeType(cmdBlock &cmdBlock);//, vector<Pipe> &pipes);
+void checkPipeType(cmdBlock &cmdBlock);
 
 void exec_cmd(cmdBlock &cmdBlock);
 

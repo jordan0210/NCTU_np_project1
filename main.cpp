@@ -22,10 +22,15 @@ int main(){
 		while (!cmdBlocks.empty()){
 			parseCmd(cmdBlocks[0]);
 			
-			checkPipeType(cmdBlocks[0]);//, pipes);
+			checkPipeType(cmdBlocks[0]);
 			
 			if (!is_first_cmd){
-				cmdBlocks[0].fd_in = pipes[pipes.size()-1].fd[0];
+				for (int i=0; i<pipes.size(); i++){
+					if (pipes[i].count == -1) {
+						cmdBlocks[0].fd_in = pipes[i].fd[0];
+						break;
+					}
+				}
 				cmdBlocks[0].has_fd_in = true;
 			} else {
 				for (int i=0; i<pipes.size(); i++){
@@ -38,27 +43,13 @@ int main(){
 			}
 			
 			exec_cmd(cmdBlocks[0]);
-			////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-			cout << cmdBlocks[0].cmd << " : " << endl;
-			cout << "    [pipeType] = " << cmdBlocks[0].pipeType << endl;
-			if (cmdBlocks[0].has_fd_in) cout << "    [fd_in] = " << cmdBlocks[0].fd_in << ";    ";
-			else cout << "    [fd_in] = NULL;    ";
-			if (cmdBlocks[0].has_fd_out) cout << "[fd_out] = " << cmdBlocks[0].fd_out << ";\n" << endl;
-			else cout << "[fd_out] = NULL;\n" << endl;
-
-			for (int i=0;i<pipes.size();i++){
-				cout << i << ": [count] = " << pipes[i].count << "; [fd] = " << pipes[i].fd[0] << ", " << pipes[i].fd[1] << endl;
-			}
-			cout << "------------------------" << endl;
-			////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			
 			cmdBlocks.erase(cmdBlocks.begin());
 			is_first_cmd = false;
 		}
 		
 		for (int i=0; i<pipes.size(); i++){
 			pipes[i].count--;
-			//if (pipes[i].count < 0)
-			//	pipes.erase(pipes.begin()+(i--));
 		}
 	}
 
@@ -67,7 +58,6 @@ int main(){
 
 // Getting start for a shell
 void init_shell(){
-	system("clear");
 	setenv("PATH", "bin:.", 1);
 }
 
@@ -122,10 +112,19 @@ void checkPipeType(cmdBlock &cmdBlock){//, vector<Pipe> &pipes){
 			cmdBlock.pipeType = 2;
 		}
 		newPipe.count = stoi(last_argv.substr(1));
-		cout << newPipe.count << endl;
-		pipe(newPipe.fd);
-		cmdBlock.fd_out = newPipe.fd[1];
-		pipes.push_back(newPipe);
+		bool merge_numberpipe = false;
+		for (int i=0; i<pipes.size(); i++){
+			if (newPipe.count == pipes[i].count){
+				cmdBlock.fd_out = pipes[i].fd[1];
+				merge_numberpipe = true;
+				break;
+			}
+		}
+		if (!merge_numberpipe){
+			pipe(newPipe.fd);
+			cmdBlock.fd_out = newPipe.fd[1];
+			pipes.push_back(newPipe);
+		}
 	} else {
 		if (last_argv == "|"){		     //normal pipe case
 			cmdBlock.pipeType = 1;
@@ -159,11 +158,11 @@ void exec_cmd(cmdBlock &cmdBlock){
 	} else if (cmd == "exit" || cmd == "EOF") {
 		exit(0);
 	} else {
-		switch (child_pid = fork()){
-			int status;
-			case -1 :
-				perror("fork()");
-				exit(-1);
+		int status;
+		while((child_pid = fork()) < 0){
+			waitpid(child_pid, &status, 0);
+		}
+		switch (child_pid){
 			case 0 :
 				if (cmdBlock.has_fd_in){
 					dup2(cmdBlock.fd_in, STDIN_FILENO);
@@ -196,8 +195,8 @@ void exec_cmd(cmdBlock &cmdBlock){
 					close(fd_redirection);
 					vec2arr(cmdBlock.argv, argv, index);
 				}
-				if (execv(("./bin/"+cmd).data(), argv) == -1)
-					cerr << "Unknow cmd: [" << cmd << "]" << endl;
+				if (execvp(cmd.data(), argv) == -1)
+					cerr << "Unknown command: [" << cmd << "]." << endl;
 				exit(0);
 			default :
 				//parent close useless pipe fd
@@ -211,7 +210,11 @@ void exec_cmd(cmdBlock &cmdBlock){
 						}
 					}
 				}
-				waitpid(child_pid, &status, 0);
+				if (cmdBlock.pipeType == 0){
+					waitpid(child_pid, &status, 0);
+				} else {
+					waitpid(child_pid, &status, WNOHANG);
+				}
 		}
 	}
 }
