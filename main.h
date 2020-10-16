@@ -4,20 +4,32 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <regex>
 
 using namespace std;
 
-#define NO_PIPE 1
-#define NORMAL_PIPE 2
-#define ERROR_PIPE 3
+typedef struct cmdBlock{
+	string cmd;
+	vector<string> argv;
+	bool has_fd_in, has_fd_out;
+	int fd_in, fd_out;
+	int pipeType; //0: no pipe, 1: pipe, 2: error pipe
+}cmdBlock;
+
+typedef struct Pipe{
+	int count;
+	int fd[2];
+}Pipe;
 
 void init_shell();
 
-void parsePipe(string cmdLine, vector<string> &cmdBlocks);
+void parsePipe(string cmdLine, vector<cmdBlock> &cmdBlocks);
 
-void parseCmd(string cmdBlock, vector<string> &argv);
+void parseCmd(cmdBlock &cmdBlock);
 
-void exec_cmd(vector<string> &vec, int fd_in[2], int fd_out[2], int pipeType);
+void checkPipeType(cmdBlock &cmdBlock);//, vector<Pipe> &pipes);
+
+void exec_cmd(cmdBlock &cmdBlock);
 
 void vec2arr(vector<string> &vec, char *arr[], int index);
 

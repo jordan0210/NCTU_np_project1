@@ -1,54 +1,64 @@
 #include "main.h"
 
+static regex reg("[|!][0-9]+");
+vector<Pipe> pipes;
 int main(){
 	init_shell();
 
 	string cmdLine;
-	vector<string> cmdBlocks;
-	vector<string> argv;
+	vector<cmdBlock> cmdBlocks;
+	//vector<Pipe> pipes;
 	bool is_first_cmd = true;
-	int fd_pipe[100][2];
+	int fd_pipe[10000][2];
 	int *fd_in, *fd_out;
-	int *fd_numberPipe = NULL;
-	int pipeType = 0;
-	int pipeCount = 0;
+	//vector<numberPipe> numberPipes;
 	
 	while (true) {
 		cout << "% ";
 		getline(cin, cmdLine);
 		parsePipe(cmdLine, cmdBlocks);
 		is_first_cmd = true;
-
-		while (!cmdBlocks.empty()){
-			parseCmd(cmdBlocks[0], argv);
-			
-			fd_in = NULL;
-			fd_out = NULL;
-			if (!is_first_cmd) {
-				fd_in = fd_pipe[pipeCount-1];
-			} else if (is_first_cmd && (fd_numberPipe != NULL)){
-				fd_in = fd_numberPipe;
-			}
-
-			if (cmdBlocks.size() != 1){
-				fd_out = fd_pipe[pipeCount++];
-				pipe(fd_out);
-				if (cmdBlocks[0][cmdBlocks[0].length()-1] == '|') pipeType = 1;
-				else if (cmdBlocks[0][cmdBlocks[0].length()-1] == '!') pipeType = 2;
-			} else{
 		
+		while (!cmdBlocks.empty()){
+			parseCmd(cmdBlocks[0]);
+			
+			checkPipeType(cmdBlocks[0]);//, pipes);
+			
+			if (!is_first_cmd){
+				cmdBlocks[0].fd_in = pipes[pipes.size()-1].fd[0];
+				cmdBlocks[0].has_fd_in = true;
+			} else {
+				for (int i=0; i<pipes.size(); i++){
+					if (pipes[i].count == 0){
+						cmdBlocks[0].fd_in = pipes[i].fd[0];
+						cmdBlocks[0].has_fd_in = true;
+						break;
+					}
+				}
 			}
+			
+			exec_cmd(cmdBlocks[0]);
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			cout << cmdBlocks[0].cmd << " : " << endl;
+			cout << "    [pipeType] = " << cmdBlocks[0].pipeType << endl;
+			if (cmdBlocks[0].has_fd_in) cout << "    [fd_in] = " << cmdBlocks[0].fd_in << ";    ";
+			else cout << "    [fd_in] = NULL;    ";
+			if (cmdBlocks[0].has_fd_out) cout << "[fd_out] = " << cmdBlocks[0].fd_out << ";\n" << endl;
+			else cout << "[fd_out] = NULL;\n" << endl;
 
-			/*if (fd_in == NULL) cout << "NULL, ";
-			else cout << fd_in << ", ";
-			if (fd_out == NULL) cout << "NULL" << endl;
-			else cout << fd_out << endl;
-			cout << is_first_cmd << ", " << (cmdBlocks.size() == 1) << ", " << pipeCount << ", " << pipeType << endl;*/
-			exec_cmd(argv, fd_in, fd_out, pipeType);
-			argv.clear();
+			for (int i=0;i<pipes.size();i++){
+				cout << i << ": [count] = " << pipes[i].count << "; [fd] = " << pipes[i].fd[0] << ", " << pipes[i].fd[1] << endl;
+			}
+			cout << "------------------------" << endl;
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 			cmdBlocks.erase(cmdBlocks.begin());
 			is_first_cmd = false;
-			pipeType = 0;
+		}
+		
+		for (int i=0; i<pipes.size(); i++){
+			pipes[i].count--;
+			//if (pipes[i].count < 0)
+			//	pipes.erase(pipes.begin()+(i--));
 		}
 	}
 
@@ -59,57 +69,93 @@ int main(){
 void init_shell(){
 	system("clear");
 	setenv("PATH", "bin:.", 1);
-	
-	printf("***********\n");
-	printf("**SUCCESS**\n");
-	printf("***********\n");
 }
 
 //parse input commandLine into commandBlocks
-void parsePipe(string cmdLine, vector<string> &cmdBlocks){
+void parsePipe(string cmdLine, vector<cmdBlock> &cmdBlocks){
 	int front = 0;
 	int end;
-	string temp_str;
+	cmdBlock cmdBlock;
 	cmdLine += "| ";
 	
 	while ((end = cmdLine.find(' ', cmdLine.find_first_of("|!", front))) != -1){
-		temp_str = cmdLine.substr(front, end-front);
-		if (temp_str[0] == ' ') temp_str = temp_str.substr(1);
-		if (end == cmdLine.length()-1) temp_str = temp_str.substr(0, temp_str.length()-1);
-		if (temp_str[temp_str.length()-1] == ' ') temp_str = temp_str.substr(0, temp_str.length()-1);
-		cmdBlocks.push_back(temp_str);
+		//initial cmdBlock
+		cmdBlock.has_fd_in = false;
+		cmdBlock.has_fd_out = false;
+		cmdBlock.fd_in = 0;
+		cmdBlock.fd_out = 0;
+		cmdBlock.pipeType = 0;
+
+		//parse cmdLine
+		cmdBlock.cmd = cmdLine.substr(front, end-front);
+		if (cmdBlock.cmd[0] == ' ') cmdBlock.cmd = (cmdBlock.cmd).substr(1);
+		if (end == cmdLine.length()-1) cmdBlock.cmd = (cmdBlock.cmd).substr(0, (cmdBlock.cmd).length()-1);
+		if ((cmdBlock.cmd)[(cmdBlock.cmd).length()-1] == ' ') cmdBlock.cmd = (cmdBlock.cmd).substr(0, (cmdBlock.cmd).length()-1);
+		cmdBlocks.push_back(cmdBlock);
 		
 		front = end + 1;
 	}
 }
 
 //parse inpur commandBlock into command and arguments 
-void parseCmd(string cmdBlock, vector<string> &argv){
+void parseCmd(cmdBlock &cmdBlock){
 	int front = 0;
 	int end;
-	cmdBlock += " ";
+	cmdBlock.cmd += " ";
 	
 	//read arguments
-	while ((end = cmdBlock.find(" ", front)) != -1){
-		argv.push_back(cmdBlock.substr(front, end-front));
+	while ((end = (cmdBlock.cmd).find(" ", front)) != -1){
+		(cmdBlock.argv).push_back((cmdBlock.cmd).substr(front, end-front));
 		front = end + 1;
 	}
 }
 
-void exec_cmd(vector<string> &vec, int fd_in[2], int fd_out[2], int pipeType){
-	char *argv[1000];
-	string cmd = vec[0];
-	int child_pid;
-
-	if (fd_out != NULL){
-		vec.erase(vec.end());
+//check the pipeType of the cmdBlock, and generate a new pipe. !! The fd_in in cmdBlock is not recorded.
+void checkPipeType(cmdBlock &cmdBlock){//, vector<Pipe> &pipes){
+	string last_argv = cmdBlock.argv.back();
+	Pipe newPipe;
+	newPipe.count = 0;
+	if (regex_match(last_argv, reg)){    //number pipe case
+		if (last_argv[0] == '|'){
+			cmdBlock.pipeType = 1;
+		} else if (last_argv[0] == '!'){
+			cmdBlock.pipeType = 2;
+		}
+		newPipe.count = stoi(last_argv.substr(1));
+		cout << newPipe.count << endl;
+		pipe(newPipe.fd);
+		cmdBlock.fd_out = newPipe.fd[1];
+		pipes.push_back(newPipe);
+	} else {
+		if (last_argv == "|"){		     //normal pipe case
+			cmdBlock.pipeType = 1;
+		} else if (last_argv == "!"){    //error pipe case
+			cmdBlock.pipeType = 2;
+		} else {						 //no pipe case
+			cmdBlock.pipeType = 0;
+		}
+		if (cmdBlock.pipeType != 0){
+			newPipe.count = -1;
+			pipe(newPipe.fd);
+			cmdBlock.fd_out = newPipe.fd[1];
+			pipes.push_back(newPipe);
+		}
 	}
+	if (cmdBlock.pipeType != 0){
+		cmdBlock.has_fd_out = true;
+	}
+}
+
+void exec_cmd(cmdBlock &cmdBlock){
+	char *argv[1000];
+	string cmd = cmdBlock.argv[0];
+	int child_pid;
 	
 	if (cmd == "printenv"){
-		if (getenv(argv[1]) != NULL)
-			cout << getenv(argv[1]) << endl;
+		if (getenv(cmdBlock.argv[1].data()) != NULL)
+			cout << getenv(cmdBlock.argv[1].data()) << endl;
 	} else if (cmd == "setenv"){
-		setenv(argv[1], argv[2], 1);
+		setenv(cmdBlock.argv[1].data(), cmdBlock.argv[2].data(), 1);
 	} else if (cmd == "exit" || cmd == "EOF") {
 		exit(0);
 	} else {
@@ -119,39 +165,51 @@ void exec_cmd(vector<string> &vec, int fd_in[2], int fd_out[2], int pipeType){
 				perror("fork()");
 				exit(-1);
 			case 0 :
-				if (fd_in != NULL){
-					dup2(fd_in[0], STDIN_FILENO);
-					close(fd_in[0]);
-					close(fd_in[1]);
+				if (cmdBlock.has_fd_in){
+					dup2(cmdBlock.fd_in, STDIN_FILENO);
 				}
-				if (fd_out != NULL){
-					if (pipeType == 1){
-						dup2(fd_out[1], STDOUT_FILENO);
-					} else if (pipeType == 2){
-						dup2(fd_out[1], STDOUT_FILENO);
-						dup2(fd_out[1], STDERR_FILENO);
+				if (cmdBlock.has_fd_out){
+					if (cmdBlock.pipeType == 1){
+						dup2(cmdBlock.fd_out, STDOUT_FILENO);
+					} else if (cmdBlock.pipeType == 2){
+						dup2(cmdBlock.fd_out, STDOUT_FILENO);
+						dup2(cmdBlock.fd_out, STDERR_FILENO);
 					}
-					close(fd_out[0]);
-					close(fd_out[1]);
 				}
-				
+				//child closes all pipe fds
+				for (int i=0; i<pipes.size(); i++){
+					close(pipes[i].fd[0]);
+					close(pipes[i].fd[1]);
+				}
+
+				// file redirection
 				int fd_redirection, index;
-				if ((index = findIndex(vec, ">")) == -1){
-					vec2arr(vec, argv, vec.size());
+				if ((index = findIndex(cmdBlock.argv, ">")) == -1){
+					if (cmdBlock.pipeType == 0)
+						vec2arr(cmdBlock.argv, argv, (cmdBlock.argv).size());
+					else
+						vec2arr(cmdBlock.argv, argv, (cmdBlock.argv).size()-1);
 				} else {
-					fd_redirection = open(vec.back().data(), O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+					fd_redirection = open((cmdBlock.argv).back().data(), O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
 					dup2(fd_redirection, STDOUT_FILENO);
 					dup2(fd_redirection, STDERR_FILENO);
 					close(fd_redirection);
-					vec2arr(vec, argv, index);
+					vec2arr(cmdBlock.argv, argv, index);
 				}
 				if (execv(("./bin/"+cmd).data(), argv) == -1)
 					cerr << "Unknow cmd: [" << cmd << "]" << endl;
 				exit(0);
 			default :
-				if (fd_in != NULL){
-					close(fd_in[0]);
-					close(fd_in[1]);
+				//parent close useless pipe fd
+				if (cmdBlock.has_fd_in){
+					for (int i=0; i<pipes.size(); i++){
+						if (pipes[i].fd[0] == cmdBlock.fd_in){
+							close(pipes[i].fd[0]);
+							close(pipes[i].fd[1]);
+							pipes.erase(pipes.begin()+i);
+							break;
+						}
+					}
 				}
 				waitpid(child_pid, &status, 0);
 		}
