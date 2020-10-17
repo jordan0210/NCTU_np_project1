@@ -16,6 +16,8 @@ int main(){
 	while (true) {
 		cout << "% ";
 		getline(cin, cmdLine);
+		if (cmdLine.length() == 0)
+			continue;
 		parsePipe(cmdLine, cmdBlocks);
 		is_first_cmd = true;
 		
