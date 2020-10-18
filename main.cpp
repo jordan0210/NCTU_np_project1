@@ -2,16 +2,13 @@
 
 static regex reg("[|!][0-9]+");
 vector<Pipe> pipes;
+
 int main(){
 	init_shell();
 
 	string cmdLine;
 	vector<cmdBlock> cmdBlocks;
-	//vector<Pipe> pipes;
 	bool is_first_cmd = true;
-	int fd_pipe[10000][2];
-	int *fd_in, *fd_out;
-	//vector<numberPipe> numberPipes;
 	
 	while (true) {
 		cout << "% ";
@@ -162,7 +159,7 @@ void exec_cmd(cmdBlock &cmdBlock){
 	} else {
 		int status;
 		while((child_pid = fork()) < 0){
-			waitpid(child_pid, &status, 0);
+			while(waitpid(-1, &status, WNOHANG) > 0);
 		}
 		switch (child_pid){
 			case 0 :
@@ -215,7 +212,7 @@ void exec_cmd(cmdBlock &cmdBlock){
 				if (cmdBlock.pipeType == 0){
 					waitpid(child_pid, &status, 0);
 				} else {
-					waitpid(child_pid, &status, WNOHANG);
+					waitpid(-1, &status, WNOHANG);
 				}
 		}
 	}
