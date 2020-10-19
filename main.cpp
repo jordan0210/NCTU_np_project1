@@ -77,9 +77,9 @@ void parsePipe(string cmdLine, vector<cmdBlock> &cmdBlocks){
 
 		//parse cmdLine
 		cmdBlock.cmd = cmdLine.substr(front, end-front);
-		if (cmdBlock.cmd[0] == ' ') cmdBlock.cmd = (cmdBlock.cmd).substr(1);
+		while(cmdBlock.cmd[0] == ' ') cmdBlock.cmd = (cmdBlock.cmd).substr(1);
 		if (end == cmdLine.length()-1) cmdBlock.cmd = (cmdBlock.cmd).substr(0, (cmdBlock.cmd).length()-1);
-		if ((cmdBlock.cmd)[(cmdBlock.cmd).length()-1] == ' ') cmdBlock.cmd = (cmdBlock.cmd).substr(0, (cmdBlock.cmd).length()-1);
+		while((cmdBlock.cmd)[(cmdBlock.cmd).length()-1] == ' ') cmdBlock.cmd = (cmdBlock.cmd).substr(0, (cmdBlock.cmd).length()-1);
 		cmdBlocks.push_back(cmdBlock);
 		
 		front = end + 1;
@@ -94,6 +94,10 @@ void parseCmd(cmdBlock &cmdBlock){
 	
 	//read arguments
 	while ((end = (cmdBlock.cmd).find(" ", front)) != -1){
+		if (end == front) {
+			front = end + 1;
+			continue;
+		}
 		(cmdBlock.argv).push_back((cmdBlock.cmd).substr(front, end-front));
 		front = end + 1;
 	}
